@@ -65,6 +65,7 @@ export default defineTool({
     if (technicianBusy(state, technician.id, input.date, start, input.durationMinutes)) {
       const alternatives = technicians
         .filter((item) => item.id !== technician.id && !technicianBusy(state, item.id, input.date, start, input.durationMinutes))
+        .sort((a, b) => Number(b.force === input.force) - Number(a.force === input.force) || b.years - a.years)
         .slice(0, 3)
         .map((item) => ({ id: item.id, name: item.name, forceLabel: FORCE_LABEL[item.force] }));
       return { ok: false as const, error: "该技师在这个时段已有预约。", alternatives };

@@ -71,7 +71,9 @@ function toGuest(visits: Appointment[], state: ParlorState, asOf: string, staleD
     lastService: lastPast.service,
     signals: {
       seasonal: seasonal(Number(asOf.slice(5, 7))),
-      technician: `上次技师是${lastPast.technicianName}，偏好${FORCE_LABEL[lastPast.force]}。`,
+      technician: lastPast.date < asOf
+        ? `上次技师是${lastPast.technicianName}，偏好${FORCE_LABEL[lastPast.force]}。`
+        : `已有即将到来的预约，技师是${lastPast.technicianName}。`,
       health: healthSignal(text),
     },
   };
