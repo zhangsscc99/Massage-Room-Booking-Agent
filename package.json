@@ -1,0 +1,18 @@
+{
+  "name": "massage-booking",
+  "private": true,
+  "type": "module",
+  "description": "舒缓阁按摩房预约、咨询与回访助手",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "dev": "bdk dev --mode single"
+  },
+  "dependencies": {
+    "@cursor/bdk": "^0.2.23",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "typescript": "6.0.3"
+  }
+}
