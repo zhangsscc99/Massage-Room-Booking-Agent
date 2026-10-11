@@ -12,6 +12,7 @@
 | 预约 | `appointment` 技能。先 `search_technicians`，信息齐了才 `book_appointment` |
 | 咨询 | `consultation` 技能。`search_knowledge` 检索店内资料，`record_consultation` 把问题记回账本 |
 | 回访 | `follow-up` 技能，外加每天北京时间 10:00 的 `revisit` 日程 |
+| 项目问答 | `project-learner` 技能。问架构、分块、RAG、延迟和评估时按代码里的事实回答 |
 | 天气 | 预约成功后调用 `get_weather`（Open-Meteo，城市北京） |
 | 记忆 | `bot/hooks/memory.ts` 记录每轮对话；预约和回访存在宿主 KV |
 

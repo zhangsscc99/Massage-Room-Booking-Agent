@@ -22,6 +22,8 @@ export default defineTool({
     guests.sort((a, b) => Number(b.needsFollowUp) - Number(a.needsFollowUp) || b.daysSinceLastVisit - a.daysSinceLastVisit);
     return {
       ok: true as const,
+      chunking: "guest-history" as const,
+      storage: "host-kv" as const,
       asOf,
       staleDays,
       seasonal: seasonal(Number(asOf.slice(5, 7))),

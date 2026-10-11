@@ -94,6 +94,8 @@ export default defineTool({
 
     return {
       ok: true as const,
+      chunking: "structured-record" as const,
+      storage: "repo-file" as const,
       checkedAvailability: start !== undefined,
       assumedForce: preferred ?? null,
       available,
