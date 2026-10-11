@@ -4,12 +4,17 @@ import { z } from "zod";
 import { knowledge, type KnowledgeDoc } from "../lib/parlor.js";
 
 const INTENTS: Array<{ id: string; words: string[] }> = [
-  { id: "prices", words: ["多少钱", "价格", "价目", "收费", "费用", "多少"] },
-  { id: "store", words: ["地址", "在哪", "营业", "电话", "怎么走", "几点"] },
+  { id: "prices", words: ["多少钱", "价格", "价目", "收费", "费用"] },
+  { id: "store", words: ["地址", "在哪", "营业", "电话", "怎么走", "几点开门"] },
   { id: "policy", words: ["取消", "改期", "迟到", "爽约", "预约规则"] },
   { id: "payment", words: ["支付", "微信", "支付宝", "会员", "充值", "付款"] },
-  { id: "caution", words: ["孕妇", "高血压", "酒", "饭后", "注意", "能不能做"] },
-  { id: "services", words: ["项目", "中式", "泰式", "精油", "足疗", "肩颈", "运动"] },
+  { id: "caution", words: ["孕妇", "高血压", "酒", "饭后", "未满", "16"] },
+  { id: "services", words: ["什么项目", "项目介绍", "有哪些项目"] },
+  { id: "overtime", words: ["加钟", "超时", "延长"] },
+  { id: "parking", words: ["停车", "车位", "开车", "停车场"] },
+  { id: "room", words: ["房间", "双人", "包间", "单人房"] },
+  { id: "dress", words: ["衣服", "穿什么", "短裤", "浴衣", "毛巾"] },
+  { id: "invoice", words: ["发票", "报销", "税号"] },
 ];
 
 export default defineTool({
@@ -48,6 +53,7 @@ function scoreDoc(query: string, doc: KnowledgeDoc): number {
   const hay = `${doc.title}\n${doc.text}`;
   let score = 0;
   if (compact.length >= 2 && hay.includes(compact)) score += 6;
+  if (compact.includes(doc.title)) score += 6;
   for (let index = 0; index < compact.length - 1; index += 1) {
     const gram = compact.slice(index, index + 2);
     if (hay.includes(gram)) score += 1;

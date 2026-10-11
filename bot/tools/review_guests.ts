@@ -56,7 +56,11 @@ function toGuest(visits: Appointment[], state: ParlorState, asOf: string, staleD
   else if (recentFollowUp) skipReason = "recent_follow_up";
   else if (daysSinceLastVisit < staleDays) skipReason = "recent_visit";
   const favorite = favoriteTechnician(ordered);
-  const text = ordered.map((item) => `${item.service} ${item.notes}`).join(" ");
+  const questions = state.consultations
+    .filter((item) => item.phone === latest.phone)
+    .map((item) => item.question)
+    .join(" ");
+  const text = `${ordered.map((item) => `${item.service} ${item.notes}`).join(" ")} ${questions}`;
   return {
     phone: latest.phone,
     guestName: latest.guestName,

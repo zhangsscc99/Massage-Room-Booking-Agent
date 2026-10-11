@@ -1,7 +1,7 @@
 import { prompt } from "@cursor/bdk";
 import { defineTool } from "@cursor/bdk/tools";
 import { z } from "zod";
-import { FORCE_LABEL, technicianById, technicians } from "../lib/parlor.js";
+import { canonicalService, FORCE_LABEL, technicianById, technicians } from "../lib/parlor.js";
 import {
   appointmentId,
   guestBusy,
@@ -80,7 +80,7 @@ export default defineTool({
       durationMinutes: input.durationMinutes,
       technicianId: technician.id,
       technicianName: technician.name,
-      service: input.service.trim(),
+      service: canonicalService(input.service),
       force: input.force,
       notes: (input.notes ?? "").trim(),
       createdAt: new Date().toISOString(),
