@@ -19,7 +19,8 @@ Run the CLI under Node, never Bun. `npm run dev` serves this agent in single mod
 
 - `bot/instructions.md` classifies each turn. Procedures live in `bot/skills/`.
 - `bot/lib/parlor.ts` is the sample catalog: technicians, prices, and shop copy. Replace it when real shop data arrives.
-- `bot/lib/store.ts` keeps appointments and follow-ups in `ctx.host.kv`.
+- `bot/lib/store.ts` keeps appointments, cancellations, waitlist, and members in `ctx.host.kv`.
+- `bot/lib/desk.ts` owns cancel, reschedule, overtime, rooms, quotes, and recharge rules. `scripts/check-desk.ts` locks those rules.
 - `bot/tools/<name>.ts` is one tool. The filename is the tool name.
 - `evals/` holds filesystem evals. Not `bot/evals/`.
 

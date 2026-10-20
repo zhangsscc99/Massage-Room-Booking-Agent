@@ -10,7 +10,7 @@ description: 有人问这个按摩房预约项目怎么做、怎么分块、RAG�
 
 舒缓阁是一个假数据的按摩房前台。一个模型回合先分类，再只进入一条链路：预约、咨询或回访。无关内容直接拒绝。
 
-代码在这个仓库里。静态技师和资料在 `bot/lib/parlor.ts`。预约、咨询、回访账本在宿主 KV 的 `parlor-state`，由 `bot/lib/store.ts` 读写。编排用的是 BDK：`bot/instructions.md`、`bot/skills/`、`bot/tools/`、`bot/schedules/revisit.md`、`bot/hooks/`。不是 LangChain，也不是 Semantic Kernel。
+代码在这个仓库里。静态技师和资料在 `bot/lib/parlor.ts`。预约、取消、候补、会员、咨询、回访账本在宿主 KV 的 `parlor-state`，由 `bot/lib/store.ts` 读写，规则在 `bot/lib/desk.ts`。编排用的是 BDK：`bot/instructions.md`、`bot/skills/`、`bot/tools/`、`bot/schedules/revisit.md`、`bot/hooks/`。不是 LangChain，也不是 Semantic Kernel。
 
 ## 分块：三个场景三种切法
 
@@ -22,13 +22,15 @@ description: 有人问这个按摩房预约项目怎么做、怎么分块、RAG�
 
 ## 存储
 
-没有单独的向量库或数据库服务。静态块随仓库走。动态账本是 JSON，键名 `parlor-state`。对话流水在 `memory/journal.jsonl`，那是会话记忆，不是 RAG 语料。
+没有单独的向量库或数据库服务。静态块随仓库走。动态账本是 JSON，键名 `parlor-state`，里面有预约、取消记录、候补、会员和咨询。对话流水在 `memory/journal.jsonl`，那是会话记忆，不是 RAG 语料。
 
 ## 评估
 
 检索质量看固定问题的第一条命中。`scripts/check-retrieval.ts` 检查价目、停车、加钟、注意事项、发票、房间、着装。价目原文必须包含「60分钟298」。
 
 回合质量看 `evals/smoke.eval.ts`：完整预约必须先匹配、再下单、再查天气；问价必须检索且回复带 298，不能下单；无关问题不能调业务工具；信息不够不能下单。
+
+宿主规则看 `scripts/check-desk.ts`：提前 2 小时才能取消和免费改期，每条预约只能免费改期一次，加钟只有 30 分钟，单人房不重叠，候补不会自动转成预约，充 500 到账 530，充 1000 到账 1100。对话里不扣会员余额。
 
 回访标准：超过 14 天没来，没有即将到店的预约，并且 7 天内没保存过问候。
 
@@ -38,9 +40,9 @@ description: 有人问这个按摩房预约项目怎么做、怎么分块、RAG�
 
 同一轮用户消息不会同时跑预约和咨询。分类先发生，然后只进一个技能。
 
-预约内部的顺序是 `search_technicians`，然后 `book_appointment`，成功后再 `get_weather`。后一步依赖前一步的结果。
+预约内部的顺序是 `search_technicians`，然后 `book_appointment`，成功后再 `get_weather`。后一步依赖前一步的结果。取消是 `list_appointments` 然后 `cancel_appointment`。改期再走 `search_technicians` 和 `reschedule_appointment`，成功后仍然 `get_weather`。加钟是 `add_overtime`。候补是 `join_waitlist`，取消成功时只返回候补人数，不自动改约。
 
-咨询的顺序是 `search_knowledge`，然后 `record_consultation`。
+咨询的顺序是 `search_knowledge` 或 `quote_visit` / `lookup_member`，然后 `record_consultation`。问规则不要调用 `recharge_member`。
 
 回访读的是预约和咨询已经写进账本的数据。每天北京时间 10:00 的 `revisit` 日程单独跑，不和客人的这一轮对话并行。
 

@@ -3,9 +3,12 @@ import {
   CLOSE_MIN,
   FORCE_LABEL,
   OPEN_MIN,
+  SINGLE_ROOMS,
   technicianById,
   type Force,
 } from "./parlor.js";
+
+export type AppointmentStatus = "booked" | "cancelled";
 
 export type Appointment = {
   id: string;
@@ -14,11 +17,15 @@ export type Appointment = {
   date: string;
   time: string;
   durationMinutes: number;
+  overtimeMinutes: number;
   technicianId: string;
   technicianName: string;
   service: string;
   force: Force;
   notes: string;
+  room: string;
+  status: AppointmentStatus;
+  rescheduled: boolean;
   createdAt: string;
 };
 
@@ -37,10 +44,48 @@ export type Consultation = {
   createdAt: string;
 };
 
+export type Cancellation = {
+  appointmentId: string;
+  phone: string;
+  guestName: string;
+  date: string;
+  time: string;
+  createdAt: string;
+};
+
+export type MemberRecharge = {
+  paidYuan: number;
+  creditedYuan: number;
+  createdAt: string;
+};
+
+export type Member = {
+  phone: string;
+  guestName: string;
+  balanceYuan: number;
+  recharges: MemberRecharge[];
+};
+
+export type WaitlistEntry = {
+  id: string;
+  guestName: string;
+  phone: string;
+  date: string;
+  time: string;
+  durationMinutes: number;
+  technicianId: string;
+  technicianName: string;
+  service: string;
+  createdAt: string;
+};
+
 export type ParlorState = {
   appointments: Appointment[];
   followUps: FollowUp[];
   consultations: Consultation[];
+  cancellations: Cancellation[];
+  members: Member[];
+  waitlist: WaitlistEntry[];
 };
 
 const KEY = "parlor-state";
@@ -97,6 +142,28 @@ export function overlaps(startA: number, durationA: number, startB: number, dura
   return startA < startB + durationB && startB < startA + durationA;
 }
 
+export function formatClock(minutes: number): string {
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+export function occupiedMinutes(item: Pick<Appointment, "durationMinutes" | "overtimeMinutes">): number {
+  return item.durationMinutes + item.overtimeMinutes;
+}
+
+export function leadMinutes(date: string, time: string, now: Date): number | undefined {
+  const start = parseClock(time);
+  if (start === undefined) return undefined;
+  return daysBetween(date, shanghaiToday(now)) * 1440 + start - shanghaiNowMinutes(now);
+}
+
+export function endsAt(time: string, durationMinutes: number, overtimeMinutes: number): string {
+  const start = parseClock(time);
+  if (start === undefined) return "";
+  return formatClock(start + durationMinutes + overtimeMinutes);
+}
+
 export function normalizePhone(raw: string): string | undefined {
   const digits = raw.replace(/\D/g, "");
   const local = digits.startsWith("86") && digits.length === 13 ? digits.slice(2) : digits;
@@ -109,12 +176,14 @@ export function technicianBusy(
   date: string,
   start: number,
   duration: number,
+  excludeId?: string,
 ): boolean {
   return state.appointments.some((item) => {
-    if (item.technicianId !== technicianId || item.date !== date) return false;
+    if (item.status === "cancelled" || item.technicianId !== technicianId || item.date !== date) return false;
+    if (excludeId !== undefined && item.id === excludeId) return false;
     const other = parseClock(item.time);
     if (other === undefined) return false;
-    return overlaps(start, duration, other, item.durationMinutes);
+    return overlaps(start, duration, other, occupiedMinutes(item));
   });
 }
 
@@ -124,13 +193,55 @@ export function guestBusy(
   date: string,
   start: number,
   duration: number,
+  excludeId?: string,
 ): Appointment | undefined {
   return state.appointments.find((item) => {
-    if (item.phone !== phone || item.date !== date) return false;
+    if (item.status === "cancelled" || item.phone !== phone || item.date !== date) return false;
+    if (excludeId !== undefined && item.id === excludeId) return false;
     const other = parseClock(item.time);
     if (other === undefined) return false;
-    return overlaps(start, duration, other, item.durationMinutes);
+    return overlaps(start, duration, other, occupiedMinutes(item));
   });
+}
+
+export function roomFree(
+  state: ParlorState,
+  date: string,
+  start: number,
+  duration: number,
+  room: string,
+  excludeId?: string,
+): boolean {
+  return !state.appointments.some((item) => {
+    if (item.status === "cancelled" || item.room !== room || item.date !== date) return false;
+    if (excludeId !== undefined && item.id === excludeId) return false;
+    const other = parseClock(item.time);
+    if (other === undefined) return false;
+    return overlaps(start, duration, other, occupiedMinutes(item));
+  });
+}
+
+export function pickRoom(
+  state: ParlorState,
+  date: string,
+  start: number,
+  duration: number,
+  excludeId?: string,
+): string | undefined {
+  return SINGLE_ROOMS.find((room) => roomFree(state, date, start, duration, room, excludeId));
+}
+
+export function assignOpenRooms(state: ParlorState): boolean {
+  let changed = false;
+  const ordered = [...state.appointments].sort((a, b) => `${a.date} ${a.time} ${a.id}`.localeCompare(`${b.date} ${b.time} ${b.id}`));
+  for (const item of ordered) {
+    if (item.status === "cancelled" || item.room.length > 0) continue;
+    const start = parseClock(item.time);
+    if (start === undefined) continue;
+    item.room = pickRoom(state, item.date, start, occupiedMinutes(item), item.id) ?? "前台安排";
+    changed = true;
+  }
+  return changed;
 }
 
 type SeedVisit = {
@@ -185,6 +296,10 @@ function seed(today: string): ParlorState {
         service: visit.service,
         force: technician.force,
         notes: visit.notes,
+        room: "",
+        status: "booked",
+        rescheduled: false,
+        overtimeMinutes: 0,
         createdAt: `${date}T06:00:00.000Z`,
       };
     }),
@@ -212,22 +327,115 @@ function seed(today: string): ParlorState {
         createdAt: `${zhouAsked}T06:00:00.000Z`,
       },
     ],
+    cancellations: [],
+    members: seedMembers(),
+    waitlist: [],
   };
 }
 
-function isState(value: unknown): value is ParlorState {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as ParlorState;
-  if (!Array.isArray(record.appointments) || !Array.isArray(record.followUps)) return false;
-  if (!Array.isArray(record.consultations)) record.consultations = [];
-  return true;
+function seedMembers(): Member[] {
+  return [
+    {
+      phone: "13800001111",
+      guestName: "张伟",
+      balanceYuan: 1100,
+      recharges: [{ paidYuan: 1000, creditedYuan: 1100, createdAt: "2026-01-08T02:00:00.000Z" }],
+    },
+    {
+      phone: "13900002222",
+      guestName: "李娜",
+      balanceYuan: 530,
+      recharges: [{ paidYuan: 500, creditedYuan: 530, createdAt: "2026-03-02T02:00:00.000Z" }],
+    },
+  ];
+}
+
+function normalizeAppointment(raw: unknown): { appointment: Appointment; changed: boolean } | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const item = raw as Partial<Appointment>;
+  if (typeof item.id !== "string" || typeof item.phone !== "string" || typeof item.date !== "string" || typeof item.time !== "string") {
+    return undefined;
+  }
+  const status: AppointmentStatus = item.status === "cancelled" ? "cancelled" : "booked";
+  const rescheduled = item.rescheduled === true;
+  const overtimeMinutes = item.overtimeMinutes === 30 ? 30 : 0;
+  const room = typeof item.room === "string" ? item.room : "";
+  const notes = typeof item.notes === "string" ? item.notes : "";
+  const durationMinutes = item.durationMinutes === 45 || item.durationMinutes === 60 || item.durationMinutes === 90 ? item.durationMinutes : 60;
+  const force: Force = item.force === "light" || item.force === "medium" || item.force === "strong" ? item.force : "medium";
+  const changed =
+    item.status !== status ||
+    item.rescheduled !== rescheduled ||
+    item.overtimeMinutes !== overtimeMinutes ||
+    item.room !== room ||
+    item.notes !== notes ||
+    item.durationMinutes !== durationMinutes ||
+    item.force !== force;
+  return {
+    changed,
+    appointment: {
+      id: item.id,
+      guestName: typeof item.guestName === "string" ? item.guestName : "",
+      phone: item.phone,
+      date: item.date,
+      time: item.time,
+      durationMinutes,
+      overtimeMinutes,
+      technicianId: typeof item.technicianId === "string" ? item.technicianId : "",
+      technicianName: typeof item.technicianName === "string" ? item.technicianName : "",
+      service: typeof item.service === "string" ? item.service : "",
+      force,
+      notes,
+      room,
+      status,
+      rescheduled,
+      createdAt: typeof item.createdAt === "string" ? item.createdAt : "",
+    },
+  };
+}
+
+function normalizeState(value: unknown): { state: ParlorState; changed: boolean } | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const record = value as Record<string, unknown>;
+  if (!Array.isArray(record.appointments) || !Array.isArray(record.followUps)) return undefined;
+  let changed = false;
+  if (!Array.isArray(record.consultations)) changed = true;
+  if (!Array.isArray(record.cancellations)) changed = true;
+  if (!("members" in record) || !Array.isArray(record.members)) changed = true;
+  if (!Array.isArray(record.waitlist)) changed = true;
+
+  const appointments: Appointment[] = [];
+  for (const raw of record.appointments) {
+    const parsed = normalizeAppointment(raw);
+    if (parsed === undefined) {
+      changed = true;
+      continue;
+    }
+    if (parsed.changed) changed = true;
+    appointments.push(parsed.appointment);
+  }
+  const state: ParlorState = {
+    appointments,
+    followUps: record.followUps as FollowUp[],
+    consultations: Array.isArray(record.consultations) ? (record.consultations as Consultation[]) : [],
+    cancellations: Array.isArray(record.cancellations) ? (record.cancellations as Cancellation[]) : [],
+    members: "members" in record && Array.isArray(record.members) ? (record.members as Member[]) : seedMembers(),
+    waitlist: Array.isArray(record.waitlist) ? (record.waitlist as WaitlistEntry[]) : [],
+  };
+  if (assignOpenRooms(state)) changed = true;
+  return { state, changed };
 }
 
 export async function loadState(kv: HostKvApi, now = new Date()): Promise<ParlorState> {
   const existing = await kv.get(KEY);
-  if (isState(existing)) return existing;
+  const normalized = normalizeState(existing);
+  if (normalized !== undefined) {
+    if (normalized.changed) await saveState(kv, normalized.state);
+    return normalized.state;
+  }
   const seeded = seed(shanghaiToday(now));
-  await kv.put(KEY, toJson(seeded));
+  assignOpenRooms(seeded);
+  await saveState(kv, seeded);
   return seeded;
 }
 
@@ -245,4 +453,46 @@ export function forceLabel(force: Force): string {
 
 export function appointmentId(phone: string, date: string, time: string): string {
   return `apt_${phone}_${date}_${time.replace(":", "")}`;
+}
+
+export type AppointmentCard = {
+  id: string;
+  guestName: string;
+  phone: string;
+  date: string;
+  time: string;
+  durationMinutes: number;
+  overtimeMinutes: number;
+  endsAt: string;
+  technicianId: string;
+  technicianName: string;
+  service: string;
+  force: Force;
+  forceLabel: string;
+  notes: string;
+  room: string;
+  status: AppointmentStatus;
+  rescheduled: boolean;
+};
+
+export function toAppointmentCard(item: Appointment): AppointmentCard {
+  return {
+    id: item.id,
+    guestName: item.guestName,
+    phone: item.phone,
+    date: item.date,
+    time: item.time,
+    durationMinutes: item.durationMinutes,
+    overtimeMinutes: item.overtimeMinutes,
+    endsAt: endsAt(item.time, item.durationMinutes, item.overtimeMinutes),
+    technicianId: item.technicianId,
+    technicianName: item.technicianName,
+    service: item.service,
+    force: item.force,
+    forceLabel: FORCE_LABEL[item.force],
+    notes: item.notes,
+    room: item.room,
+    status: item.status,
+    rescheduled: item.rescheduled,
+  };
 }

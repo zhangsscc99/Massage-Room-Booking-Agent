@@ -5,6 +5,28 @@ export const CITY = "北京";
 export const FRONT_DESK = "010-88886666";
 export const OPEN_MIN = 10 * 60;
 export const CLOSE_MIN = 22 * 60;
+export const NOTICE_MINUTES = 120;
+export const OVERTIME_MINUTES = 30;
+
+export const SINGLE_ROOMS = ["1号房", "2号房", "3号房", "4号房", "5号房", "6号房", "7号房", "8号房"] as const;
+
+export const MEMBER_OFFERS = [
+  { paidYuan: 500, creditedYuan: 530 },
+  { paidYuan: 1000, creditedYuan: 1100 },
+] as const;
+
+export const OVERTIME_PRICE: Record<string, number> = {
+  中式推拿: 80,
+  泰式拉伸: 100,
+  精油SPA: 90,
+  足疗: 60,
+  肩颈专项: 60,
+  运动恢复: 90,
+};
+
+export function memberCredit(paidYuan: number): number | undefined {
+  return MEMBER_OFFERS.find((item) => item.paidYuan === paidYuan)?.creditedYuan;
+}
 
 export type Force = "light" | "medium" | "strong";
 export type Gender = "male" | "female";
@@ -194,6 +216,11 @@ function serviceText(): string {
   return services.map((item) => `${item.name}：${item.summary}`).join("");
 }
 
+function overtimeText(): string {
+  const bits = services.map((item) => `${item.name}${OVERTIME_PRICE[item.name]}元`).join("，");
+  return `加钟按${OVERTIME_MINUTES}分钟计，且必须在22:00前结束。${bits}。已有预约可以在对话里加一次30分钟，技师和房间都要仍空着，不能加第二次。费用到店补，预约时不预收。`;
+}
+
 export const knowledge: KnowledgeDoc[] = [
   {
     id: "store",
@@ -208,12 +235,12 @@ export const knowledge: KnowledgeDoc[] = [
   {
     id: "policy",
     title: "预约与取消",
-    text: "预约需要姓名、11位手机号、日期、开始时间（整点或半点）、时长和项目或力度偏好。时长只有45、60、90分钟。可提前2小时免费改期一次。迟到超过15分钟，按剩余时间服务。取消需提前2小时，否则记一次爽约。对话里不能直接取消或改掉旧预约，请联系前台010-88886666。",
+    text: "预约需要姓名、11位手机号、日期、开始时间（整点或半点）、时长和项目或力度偏好。时长只有45、60、90分钟。取消和免费改期都要在开始前至少2小时，每条预约只能免费改期一次。开始前不足2小时就不能在对话里取消或改期，请打前台010-88886666。迟到超过15分钟，按剩余时间服务。技师没空可以留下候补，空档放出后由前台联系，不会自动改约。",
   },
   {
     id: "payment",
     title: "支付与会员",
-    text: "支持到店微信支付、支付宝和现金。不支持线上预付。会员在前台办理：充1000送100，充500送30。积分只能到店核销，不能折现。",
+    text: "支持到店微信支付、支付宝和现金。不支持线上预付，对话里不扣会员余额。会员在前台收款后入账：充1000到账1100，充500到账530。其他金额不能入账。余额只能到店划扣，不能折现。",
   },
   {
     id: "caution",
@@ -228,7 +255,7 @@ export const knowledge: KnowledgeDoc[] = [
   {
     id: "overtime",
     title: "加钟",
-    text: "加钟按30分钟计，且必须在22:00前结束。中式推拿80元，泰式拉伸100元，精油SPA90元，足疗60元，肩颈专项60元，运动恢复90元。加钟在房间里向前台补，不在预约时预收。",
+    text: overtimeText(),
   },
   {
     id: "parking",
@@ -238,7 +265,7 @@ export const knowledge: KnowledgeDoc[] = [
   {
     id: "room",
     title: "房间",
-    text: "店内有8间单人房、2间双人房。双人项目要两名技师同一时段都空闲，预约时请说明要双人。房间不指定楼层，到店由前台安排。",
+    text: "店内有8间单人房、2间双人房。单人预约会安排1号房到8号房，同一时段不重复。双人房请到店由前台安排，对话里不指定双人房。",
   },
   {
     id: "dress",

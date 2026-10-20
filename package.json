@@ -4,7 +4,7 @@
   "type": "module",
   "description": "舒缓阁按摩房预约、咨询与回访助手",
   "scripts": {
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && tsx scripts/check-retrieval.ts && tsx scripts/check-desk.ts",
     "dev": "bdk dev --mode single"
   },
   "dependencies": {

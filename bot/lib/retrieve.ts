@@ -5,8 +5,8 @@ export const TOPIC_CHUNKING = "topic-doc";
 const INTENTS: Array<{ id: string; words: string[] }> = [
   { id: "prices", words: ["多少钱", "价格", "价目", "收费", "费用"] },
   { id: "store", words: ["地址", "在哪", "营业", "电话", "怎么走", "几点开门"] },
-  { id: "policy", words: ["取消", "改期", "迟到", "爽约", "预约规则"] },
-  { id: "payment", words: ["支付", "微信", "支付宝", "会员", "充值", "付款"] },
+  { id: "policy", words: ["取消", "改期", "迟到", "爽约", "预约规则", "候补"] },
+  { id: "payment", words: ["支付", "微信", "支付宝", "会员", "充值", "付款", "余额", "到账", "入账"] },
   { id: "caution", words: ["孕妇", "高血压", "酒", "饭后", "未满", "16"] },
   { id: "services", words: ["什么项目", "项目介绍", "有哪些项目"] },
   { id: "overtime", words: ["加钟", "超时", "延长"] },
@@ -67,6 +67,9 @@ const GOLDENS: Array<{ query: string; expectId: string; expectText?: string }> =
   { query: "能开发票吗", expectId: "invoice" },
   { query: "有双人房吗", expectId: "room" },
   { query: "需要自己带毛巾吗", expectId: "dress" },
+  { query: "可以提前多久取消预约", expectId: "policy", expectText: "2小时" },
+  { query: "会员充值1000到账多少", expectId: "payment", expectText: "到账1100" },
+  { query: "技师没空能候补吗", expectId: "policy", expectText: "候补" },
 ];
 
 export function checkRetrieval(): { ok: boolean; checks: RetrievalCheck[] } {
